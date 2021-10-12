@@ -18,6 +18,7 @@ setup(
         "matplotlib",
         "lorem",
         "requests",
+        "pandas"
     ],
     package_data={
         "":["config.xml"]

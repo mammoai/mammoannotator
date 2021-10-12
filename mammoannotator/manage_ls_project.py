@@ -5,6 +5,7 @@ import sys
 import os
 from csv import DictWriter
 from mammoannotator.mri import MRITask
+import pandas as pd
 
 def create_project(raw_args):
     print(__file__)
@@ -63,6 +64,7 @@ def create_tasks(raw_args):
     parser.add_argument('--img-server-root', default="/opt/server_root/")
     parser.add_argument("--img-server-url", default="http://localhost:8000")
     parser.add_argument('--ls-url', default="http://localhost:8080/api/tasks/")
+    parser.add_argument('--assessment-csv-fn', default="csv_actual.csv")
     args = parser.parse_args(raw_args)
     token = os.environ.get("LS_TOKEN", None)
     assert token is not None, "export LS_TOKEN as env variable and try again"
@@ -80,11 +82,16 @@ def create_tasks(raw_args):
         tasks = MRITask.from_root_folder(args.folder)
     csv_path = os.path.join(args.folder, f"project{args.project_id}_tasks.csv")
     assert not os.path.exists(csv_path), f"This is a safeguard to avoid overwriting. There is already a csv at {csv_path}. If you really want to run it, you can move or delete the file and run again."
+    
+    assessment_csv_path = os.path.join(args.img_server_root, args.assessment_csv_fn)
+    assessment_df = pd.read_csv(assessment_csv_path)
+
     with open(csv_path, "w") as file:
         writer = DictWriter(file, fieldnames=["task_id", "patient_id", "study_id", "left_sagittal", "right_sagittal", "left_axial", "right_axial"])
         writer.writeheader()
         for task in tasks:
             task.make_url(args.img_server_root, args.img_server_url)
+            task.set_assessment_from_csv(assessment_df)
             task_dict = json.dumps(task.as_dict())
             data = {
                 "data": task_dict,

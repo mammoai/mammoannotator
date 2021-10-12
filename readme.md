@@ -7,12 +7,14 @@ Tools for setting up a Breast Cancer labeling app.
 1. The images that will be annotated in the following folder structure:
 ```
 - <root_folder>/
+-- actual_csv.csv
 -- <patient_id>/
 --- <study_id>/
 ---- <x>_<x>_<x>_<x>_<x>_<x>_<x>_<laterality>_<view>.jpeg
 ```
 Where `<x>` is whatever identifier you want to set; `<laterality>` is one of `l` or `r`; and `<view>` is one of `Ax` or `Sag`. All the images in a study are expected to have the same pixel dimensions. Missing combinations of laterality and view are replaced with black in the task image.
 
+`actual_csv.csv` has a header row and contains at least 3 columns `anonpatientid, anonexaminationstudyid, reporttexttext` in any order. It is expected that the combination of patient_id and study_id are unique. The task creation script will look for those values according to the folders that it is visiting.
 
 ## Setting up the labeling app
 You will need to run two containers in the following order:
@@ -58,5 +60,8 @@ mammoannotator tasks
 ```
 This script will go through each patient in the root folder creating a new task per each study. It will create a `crops/` folder inside the study where the new images are stored. And a csv with the ids and the cropping info in the `<root_folder>`
 
+There are other parameters for the CLI, you can find them by running `mammoannotator --help`, `mammoannotator project --help` or `mammoannotator tasks --help`
+
 If you enter to the project's page and reload, you should be able to see all the tasks. Happy labeling!
+
 

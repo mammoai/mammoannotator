@@ -1,8 +1,6 @@
 import os
 from dataclasses import dataclass, asdict
-from random import randint
 from typing import List, Tuple, Dict, Union
-import requests
 import json
 import numpy as np
 from PIL import Image
@@ -135,6 +133,7 @@ class MRITask:
     image_path:str
     crops:Dict[Tuple[str,str],CroppedImage]
     crop_details:Dict[str, Dict[str, Union[int, bool]]]
+    assessment:str
 
     @classmethod
     def from_root_folder(cls, root_path:str) -> List['MRITask']:
@@ -157,6 +156,23 @@ class MRITask:
         crop = crop.image if crop is not None else \
             np.zeros([n_px, n_px], dtype=np.uint8)
         return crop
+
+    def set_assessment_from_csv(self, df):
+        row = df[
+            (df["anonexaminationstudyid"]==self.study_id) & 
+            (df["anonpatientid"]==self.patient_id)
+        ]
+        if len(row) == 0:
+            print(f"could not find row in assessment csv for study: {self.study_id} and patient: {self.patient_id}")
+            self.assessment = "Not found in csv"
+            return
+        elif len(row) > 1:
+            print(f"more than one row in assessment csv for study: {self.study_id} and patient: {self.patient_id}")
+            self.assessment = "More than one found in csv"
+            return
+        assessment = row["reporttexttext"].values[0]
+        assert isinstance(assessment, str), f"Assessment is not str: {assessment}"
+        self.assessment = assessment
 
     @classmethod
     def from_study_folder(cls, study_path:str) -> 'MRITask':
