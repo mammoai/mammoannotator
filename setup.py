@@ -7,7 +7,7 @@ setup(
     author='Fernando Cossio',
     author_email='fer_cossio@hotmail.com',
     url='',
-    packages=[],
+    packages=find_packages(),
     package_dir={
         "": ".",
     },
