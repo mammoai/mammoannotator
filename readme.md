@@ -33,7 +33,7 @@ docker run -it -p 127.0.0.1:8080:8080 -v `pwd`/labelstudio:/label-studio/data he
 ```
 In the browser go to `http://localhost:8080` and create an account in the app. This account is only stored locally. The password can't be recovered but creating another account will allow you to access the same projects.
 
-Once you have created a user and logged in, go to your account in the upper-right corner > "Account & Settings". There you will find a Token that is needed to set up the app from the API which Mammoannotator CLI uses.
+Once you have created a user and logged in, go to your account in the upper-right corner > "Account & Settings". There you will find a **Token** that is needed to set up the app from the API which Mammoannotator CLI uses.
 
 ### 2. Img server and Mammoannotor CLI
 
