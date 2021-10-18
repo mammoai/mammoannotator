@@ -14,7 +14,7 @@
         <View>
             <Image name="image" 
                 value="$image_path" 
-                width="720px" 
+                width="900px" 
                 maxWidth="1500px" 
                 zoom="true" 
                 brightnessControl="true" 

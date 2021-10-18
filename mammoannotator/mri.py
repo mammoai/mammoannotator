@@ -4,10 +4,8 @@ from typing import List, Tuple, Dict, Union
 import json
 import numpy as np
 from PIL import Image
-from matplotlib import pyplot as plt
 import logging
 import random
-import lorem
 
 def list_dirs(path:str) -> List[str]:
     """List all dirs inside path"""
@@ -55,7 +53,6 @@ class RawImage:
     @staticmethod
     def parse_file_name(fn:str) -> Tuple[str, str]:
         root, extension = os.path.splitext(fn)
-        print(root)
         _, _, _, _, _, _, laterality, view = root.split("_")
         if laterality == 'l':
             laterality = 'left'
@@ -207,7 +204,7 @@ class MRITask:
         
         # get details
         patient_id, study_id = study_path.split(os.sep)[-2:]
-        assesment =  "\n".join([lorem.paragraph() for i in range(random.randint(10,20))])
+        assesment =  ""
         crop_details = {f"{lat}_{view}": cropped_image.get_crop_details() for (lat, view), cropped_image in frames.items()}
         
 
@@ -227,6 +224,15 @@ class MRITask:
             crops=Dict[Tuple[str,str],CroppedImage],
             crop_details=crop_details
         )
+
+    @classmethod
+    def from_csv_row(cls, root_path, row:dict):
+        """row is a dict that has 'anonpatientid' and 'anonexaminationstudyid'"""
+        study_path = os.path.join(root_path, row['anonpatientid'], row['anonexaminationstudyid'])
+        assert os.path.exists(study_path), f"Study path not found: {study_path}"
+        task = cls.from_study_folder(study_path)
+        task.assessment = row['reporttexttext']
+        return task
 
     def as_dict(self):
         doc = asdict(self)

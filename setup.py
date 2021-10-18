@@ -10,17 +10,16 @@ setup(
     packages=find_packages(where='src'),
     entry_points={  
     'console_scripts': [
-            'mammoannotator=mammoannotator.manage_ls_project:main'
+            'mammoannotator=mammoannotator.cli:main'
         ],
     },
     install_requires=[
         "numpy",
         "matplotlib",
-        "lorem",
+        "tqdm",
         "requests",
-        "pandas"
     ],
     package_data={
-        "":["config.xml"]
+        "":["config.xml", "instruction.html"]
     }
 )
