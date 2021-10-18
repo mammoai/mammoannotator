@@ -7,14 +7,14 @@ setup(
     author='Fernando Cossio',
     author_email='fer_cossio@hotmail.com',
     url='',
-    packages=find_packages(where='src'),
+    packages=[],
     package_dir={
         "": ".",
     },
     entry_points={  
-    'console_scripts': [
-            'mammoannotator=mammoannotator.cli:main'
-        ],
+        'console_scripts': [
+                'mammoannotator=mammoannotator.cli:main'
+            ],
     },
     install_requires=[
         "numpy",
