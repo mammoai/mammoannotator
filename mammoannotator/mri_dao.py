@@ -12,9 +12,7 @@ class TaskDAO:
         self.connector = connector
 
     def create_task(self, task:MRITask, project_id, img_server_url, img_server_root):
-        print(img_server_root, img_server_url)
         task.make_url(img_server_root, img_server_url)
-        print(task.image_path)
         task_dict = json.dumps(task.as_dict())
         answer = self.connector.create_task(data=task_dict, project=project_id)
         task_id = answer['id']
@@ -104,27 +102,4 @@ class ProjectDAO:
                 task_dict["right_axial"] = task.crop_details.get(
                     'right_axial', None)
                 writer.writerow(task_dict)
-
-        
-if __name__ == "__main__":
-    # csv_row={
-    #         "anonpatientid":"57444e63574d694369793169316f44504278385448673d3d",
-    #         "anonexaminationstudyid":"57444e63574d694369793169316f44504278385448673d3d"
-    #     }
-    root_path = "/home/fer/projects/mammoannotator_2/test/data/mri"
-    # task = MRITask.from_csv_row(root_path=root_path, row=csv_row)
-    connector = LabelStudioAPI(
-        url="http://localhost:8080",
-        token="fcae48950e1cea13e746accd17708172292fb0ae")
-    project_dao = ProjectDAO(connector)
-    # task_dao = TaskDAO(connector)
-    img_server_url = "http://localhost:8000"
-    csv_path = "/home/fer/projects/mammoannotator_2/test/data/mri/csv_actual.csv"
-    interface_config_path = "/home/fer/projects/mammoannotator/mammoannotator/config.xml"
-    instruction_path = "/home/fer/projects/mammoannotator/mammoannotator/instruction.html"
-
-    project_dao.create_mri_project_from_csv(csv_path, interface_config_path, 
-        instruction_path, root_path, img_server_url)
-    # id_ = task_dao.create_task(task, 20, img_server_url=img_server_url, img_server_root=root_path)
-    # print(id_)
     
