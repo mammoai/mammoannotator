@@ -8,6 +8,9 @@ setup(
     author_email='fer_cossio@hotmail.com',
     url='',
     packages=find_packages(where='src'),
+    package_dir={
+        "": ".",
+    },
     entry_points={  
     'console_scripts': [
             'mammoannotator=mammoannotator.cli:main'
