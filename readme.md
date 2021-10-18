@@ -10,9 +10,9 @@ Tools for setting up a Breast Cancer labeling app.
 ```
 <root_folder>/
     <csv_file>.csv
-        <patient_id>/
-            <study_id>/
-                <x>_<x>_<x>_<x>_<x>_<x>_<x>_<laterality>_<view>.jpeg
+    <patient_id>/
+        <study_id>/
+            <x>_<x>_<x>_<x>_<x>_<x>_<x>_<laterality>_<view>.jpeg
 ```
 Where `<x>` is whatever identifier you want to set; `<laterality>` is one of `l` or `r`; and `<view>` is one of `Ax` or `Sag`. All the images in a study are expected to have the same pixel dimensions. Missing combinations of laterality and view are replaced with black in the task image.
 
