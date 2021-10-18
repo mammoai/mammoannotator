@@ -8,7 +8,7 @@ def create_project(raw_args):
     """The csv must be in the root_path where all the patients' folders are."""
     dirname = os.path.dirname(__file__)
     default_config_path = os.path.join(dirname, "config.xml")
-    default_instruction_path = os.path.join(dirname, "intruction.html")
+    default_instruction_path = os.path.join(dirname, "instruction.html")
     parser = ArgumentParser()
     parser.add_argument("--csv-path", type=str, required=True)
     parser.add_argument("--interface-config", "-c", type=str, 
