@@ -19,7 +19,7 @@ class LabelStudioAPI:
 
     def is_valid(self, raise_exception=True):
         """Check that the connection is working"""
-        response = self._get_projects_request()
+        response = self._get_projects()
         if raise_exception:
             self._check_status_code(response, 200)
         return response.status_code == 200
