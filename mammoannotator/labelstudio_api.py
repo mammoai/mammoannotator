@@ -31,7 +31,7 @@ class LabelStudioAPI:
     # Projects
 
     def _get_projects(self):
-        url = f'{self.ls_url}/api/projects'
+        url = f'{self.url}/api/projects'
         return requests.get(url=url, headers=self.headers())
 
     def list_projects(self):
