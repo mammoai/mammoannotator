@@ -1,18 +1,20 @@
 <View style="display: flex">
     <View style="flex: 80%">
         <BrushLabels name="labels" toName="image">
-            <Label value="5 mass" background="#ff0000"/>
-            <Label value="4 mass" background="#990000" />
-            <Label value="5 nonmass" background="#ff9100"/>
-            <Label value="4 nonmass" background="#b85c00"/>
-            <Label value="2-3 lesion" background="#003cff"/>
-            <Label value="Cyst" background="#00d0ff"/>
-            <Label value="Lgll susp" background="#fffb00"/>
-            <Label value="Lgll norm" background="#00ff44"/>
-            <Label value="Nipple" background="#FF66CC"/>
+            <Label value="5 mass" background="red"/>
+            <Label value="4 mass" background="darkred" />
+            <Label value="5 nonmass" background="orange"/>
+            <Label value="4 nonmass" background="darkorange"/>
+            <Label value="2-3 lesion" background="blue"/>
+            <Label value="Cyst" background="deepskyblue"/>
+            <Label value="Lgll susp" background="yellow"/>
+            <Label value="Lgll norm" background="green"/>
+            <Label value="Nipple" background="deeppink"/>
+            <Label value="Vessel" background="darkviolet"/>
+            <Label value="Heart" background="purple"/>
         </BrushLabels>
         <View>
-            <Image name="image" 
+            <Image name="image"
                 value="$image_path" 
                 width="900px" 
                 maxWidth="1500px" 
