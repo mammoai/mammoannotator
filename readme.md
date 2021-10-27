@@ -69,10 +69,17 @@ To create a new project from a csv, run
 ```
 mammoannotator project --csv-path <path to your csv>
 ```
-If everything worked fine, you should be able to reload the "Projects" page in the app and see a new project there with one task per row of the csv. Additionally you will get a copy of your csv with some extra columns named `<project_id>-MRI-<date>.csv` this will link the row with the ls_project and ls_task_id. It will be important for processing the annotations in the future.
+If everything worked fine, you should be able to reload the "Projects" page in the app and see a new project there with one task per row of the csv. Additionally you will get a copy of your csv with some extra columns named `<project_id>-MRI-<date>.csv` this will link the row with the ls_project and ls_task_id. It will be important for exporting the annotations in the future.
 
 There are other configurable parameters for the CLI, you can find them by running `mammoannotator --help`, `mammoannotator project --help`
 
 Happy labeling!
 
+# Exporting the annotations
+After all the tasks for a specific csv have been annotated. You can export the annotations back to binary images in the original sizes (before cropping, rotating and flipping) one per lat_view and label.
 
+```
+mammoannotator export --csv-path <project_id>-MRI-<creation date>.csv
+```
+
+This will output a csv file that has one line per exported image linked by task_id and annotation_id to the copy of your original csv.
