@@ -317,12 +317,15 @@ class ProjectDAO:
             assert "anonExaminationStudyId" in fields
             assert "ReportTextText" in fields
             for row in reader:
-                assert os.path.exists(
-                    os.path.join(
-                        root_path, row["anonPatientId"], row["anonExaminationStudyId"]
-                    )
-                ), f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist"
-                task_dicts.append(row)
+                try:
+                    assert os.path.exists(
+                        os.path.join(
+                            root_path, row["anonPatientId"], row["anonExaminationStudyId"]
+                        )
+                    ), f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist"
+                    task_dicts.append(row)
+                except:
+                    print(f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist")
         # create project
         print(f"Creating {title} {description}")
         project_id = self.create_project(
