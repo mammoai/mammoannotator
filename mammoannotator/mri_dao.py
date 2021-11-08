@@ -318,7 +318,7 @@ class ProjectDAO:
                     os.path.join(
                         root_path, row["anonPatientId"], row["anonExaminationStudyId"]
                     )
-                )
+                ), f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist"
                 task_dicts.append(row)
         # create project
         print(f"Creating {title} {description}")
