@@ -346,7 +346,8 @@ class ProjectDAO:
         with open(new_csv_path, "w") as file:
             writer = DictWriter(file, out_fieldnames)
             writer.writeheader()
-            for task_dict in tqdm(task_dicts, desc="Creating tasks"):
+            pbar = tqdm(total = len(task_dicts), desc = "Creating tasks")
+            for task_dict in task_dicts:
                 try:
                     task = MRITask.from_csv_row(root_path, task_dict)
                     task_id = task_dao.create_task(
@@ -365,6 +366,7 @@ class ProjectDAO:
                     task_dict["left_axial"] = task.crop_details.get("left_axial", None)
                     task_dict["right_axial"] = task.crop_details.get("right_axial", None)
                     writer.writerow(task_dict)
+                    pbar.update()
                 except Exception as e:
                     print(e)
                     print(f"Failed to create task for {task_dict['anonPatientId']}/{task_dict['anonExaminationStudyId']}")
