@@ -251,7 +251,7 @@ class MRITask:
     def from_csv_row(cls, root_path, row: dict):
         """row is a dict that has 'anonPatientId' and 'anonExaminationStudyId'"""
         study_path = os.path.join(
-            root_path, row["ReportTextText"], row["anonExaminationStudyId"]
+            root_path, row["anonPatientId"], row["anonExaminationStudyId"]
         )
         assert os.path.exists(study_path), f"Study path not found: {study_path}"
         task = cls.from_study_folder(study_path)
