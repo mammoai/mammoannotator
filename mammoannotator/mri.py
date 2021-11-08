@@ -170,8 +170,8 @@ class MRITask:
 
     def set_assessment_from_csv(self, df):
         row = df[
-            (df["anonexaminationstudyid"] == self.study_id)
-            & (df["anonpatientid"] == self.patient_id)
+            (df["anonExaminationStudyId"] == self.study_id)
+            & (df["anonPatientId"] == self.patient_id)
         ]
         if len(row) == 0:
             print(
@@ -185,7 +185,7 @@ class MRITask:
             )
             self.assessment = "More than one found in csv"
             return
-        assessment = row["reporttexttext"].values[0]
+        assessment = row["ReportTextText"].values[0]
         assert isinstance(assessment, str), f"Assessment is not str: {assessment}"
         self.assessment = assessment
 
@@ -249,13 +249,13 @@ class MRITask:
 
     @classmethod
     def from_csv_row(cls, root_path, row: dict):
-        """row is a dict that has 'anonpatientid' and 'anonexaminationstudyid'"""
+        """row is a dict that has 'anonPatientId' and 'anonExaminationStudyId'"""
         study_path = os.path.join(
-            root_path, row["anonpatientid"], row["anonexaminationstudyid"]
+            root_path, row["ReportTextText"], row["anonExaminationStudyId"]
         )
         assert os.path.exists(study_path), f"Study path not found: {study_path}"
         task = cls.from_study_folder(study_path)
-        task.assessment = row["reporttexttext"]
+        task.assessment = row["ReportTextText"]
         return task
 
     def as_dict(self):

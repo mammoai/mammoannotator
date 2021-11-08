@@ -294,7 +294,7 @@ class ProjectDAO:
 
         Args:
             csv_path (str): A csv that contains at least the following columns:
-             'anonpatientid', 'anonexaminationstudyid', 'reporttexttext'.
+             'anonPatientId', 'anonExaminationStudyId', 'ReportTextText'.
             interface_config_path (str): Path to XML formatted config.
             instruction_path (str): Path to HTML formatted instructions.
             root_path (str): Path where the patients' folders exist. This is
@@ -310,13 +310,13 @@ class ProjectDAO:
         with open(csv_path, newline="") as file:
             reader = DictReader(file)
             fields = reader.fieldnames
-            assert "anonpatientid" in fields
-            assert "anonexaminationstudyid" in fields
-            assert "reporttexttext" in fields
+            assert "anonPatientId" in fields
+            assert "anonExaminationStudyId" in fields
+            assert "ReportTextText" in fields
             for row in reader:
                 assert os.path.exists(
                     os.path.join(
-                        root_path, row["anonpatientid"], row["anonexaminationstudyid"]
+                        root_path, row["anonPatientId"], row["anonExaminationStudyId"]
                     )
                 )
                 task_dicts.append(row)
@@ -387,8 +387,8 @@ class ProjectDAO:
             ):
                 project_id = row["ls_project_id"]
                 task_id = row["ls_task_id"]
-                patient_id = row["anonpatientid"]
-                study_id = row["anonexaminationstudyid"]
+                patient_id = row["anonPatientId"]
+                study_id = row["anonExaminationStudyId"]
                 study_folder = os.path.join(root_path, patient_id, study_id)
                 image_rows = task_dao.get_task_annotations(
                     project_id=project_id, task_id=task_id, study_path=study_folder
