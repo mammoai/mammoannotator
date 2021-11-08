@@ -347,23 +347,26 @@ class ProjectDAO:
             writer = DictWriter(file, out_fieldnames)
             writer.writeheader()
             for task_dict in tqdm(task_dicts, desc="Creating tasks"):
-                task = MRITask.from_csv_row(root_path, task_dict)
-                task_id = task_dao.create_task(
-                    task, project_id, img_server_url, root_path
-                )
-                # Add information to output dict
-                task_dict["ls_project_id"] = project_id
-                task_dict["ls_task_id"] = task_id
-                task_dict["left_sagittal"] = task.crop_details.get(
-                    "left_sagittal", None
-                )
-                task_dict["right_sagittal"] = task.crop_details.get(
-                    "right_sagittal", None
-                )
-                task_dict["left_axial"] = task.crop_details.get("left_axial", None)
-                task_dict["right_axial"] = task.crop_details.get("right_axial", None)
-                writer.writerow(task_dict)
-
+                try:
+                    task = MRITask.from_csv_row(root_path, task_dict)
+                    task_id = task_dao.create_task(
+                        task, project_id, img_server_url, root_path
+                    )
+                    # Add information to output dict
+                    task_dict["ls_project_id"] = project_id
+                    task_dict["ls_task_id"] = task_id
+                    task_dict["left_sagittal"] = task.crop_details.get(
+                        "left_sagittal", None
+                    )
+                    task_dict["right_sagittal"] = task.crop_details.get(
+                        "right_sagittal", None
+                    )
+                    task_dict["left_axial"] = task.crop_details.get("left_axial", None)
+                    task_dict["right_axial"] = task.crop_details.get("right_axial", None)
+                    writer.writerow(task_dict)
+                except:
+                    print(f"Failed to create task for {task_dict['anonPatientId']}/{task_dict['anonExaminationStudyId']}")
+                    print(f"{task_dict}")
     def export_tasks_from_csv(self, tasks_csv_path: str, images_csv_path: str):
         root_path, csv_name = os.path.split(tasks_csv_path)
         task_dao = TaskDAO(self.connector)
