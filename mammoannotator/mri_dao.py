@@ -1,6 +1,8 @@
+import csv
 import json
 import os
 import re
+import sys
 import zipfile
 from csv import DictReader, DictWriter
 from datetime import datetime
@@ -301,6 +303,7 @@ class ProjectDAO:
              also the root of the img server
             img_server_url (str): base url where the images will be found
         """
+        csv.field_size_limit(sys.maxsize)
         csv_parent, csv_basename = os.path.split(csv_path)
         today = datetime.now().strftime("%Y-%m-%d")
         title = f"MRI {today}"
