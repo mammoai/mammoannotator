@@ -55,20 +55,23 @@ class RawImage:
     @staticmethod
     def parse_file_name(fn: str) -> Tuple[str, str]:
         root, extension = os.path.splitext(fn)
-        _, _, _, _, _, _, laterality, view = root.split("_")
+        parts = root.split("_")
+
+        laterality = parts[-2]
         if laterality == "l":
             laterality = "left"
         elif laterality == "r":
             laterality = "right"
         else:
-            raise Exception(f"Laterality is '{laterality}' instead of 'l' or 'r'")
+            raise Exception(f"For {fn}, laterality is '{laterality}' instead of 'l' or 'r'")
 
+        view = parts[-1]
         if view == "Sag":
             view = "sagittal"
         elif view == "Ax":
             view = "axial"
         else:
-            raise Exception(f"View is '{view}' instead of 'Sag' or 'Ax'")
+            raise Exception(f"For {fn}, view is '{view}' instead of 'Sag' or 'Ax'")
         return laterality, view
 
 
