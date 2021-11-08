@@ -352,6 +352,7 @@ class ProjectDAO:
                     task_id = task_dao.create_task(
                         task, project_id, img_server_url, root_path
                     )
+                    print(task_id)
                     # Add information to output dict
                     task_dict["ls_project_id"] = project_id
                     task_dict["ls_task_id"] = task_id
@@ -364,7 +365,8 @@ class ProjectDAO:
                     task_dict["left_axial"] = task.crop_details.get("left_axial", None)
                     task_dict["right_axial"] = task.crop_details.get("right_axial", None)
                     writer.writerow(task_dict)
-                except:
+                except Exception as e:
+                    print(e)
                     print(f"Failed to create task for {task_dict['anonPatientId']}/{task_dict['anonExaminationStudyId']}")
     def export_tasks_from_csv(self, tasks_csv_path: str, images_csv_path: str):
         root_path, csv_name = os.path.split(tasks_csv_path)
