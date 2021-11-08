@@ -366,7 +366,6 @@ class ProjectDAO:
                     writer.writerow(task_dict)
                 except:
                     print(f"Failed to create task for {task_dict['anonPatientId']}/{task_dict['anonExaminationStudyId']}")
-                    print(f"{task_dict}")
     def export_tasks_from_csv(self, tasks_csv_path: str, images_csv_path: str):
         root_path, csv_name = os.path.split(tasks_csv_path)
         task_dao = TaskDAO(self.connector)
