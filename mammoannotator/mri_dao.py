@@ -3,6 +3,7 @@ import json
 import os
 import re
 import sys
+import traceback
 import zipfile
 from csv import DictReader, DictWriter
 from datetime import datetime
@@ -320,12 +321,17 @@ class ProjectDAO:
                 try:
                     assert os.path.exists(
                         os.path.join(
-                            root_path, row["anonPatientId"], row["anonExaminationStudyId"]
+                            root_path,
+                            row["anonPatientId"],
+                            row["anonExaminationStudyId"],
                         )
                     ), f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist"
                     task_dicts.append(row)
                 except:
-                    print(f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist")
+                    print(
+                        f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist"
+                    )
+
         # create project
         print(f"Creating {title} {description}")
         project_id = self.create_project(
@@ -346,14 +352,13 @@ class ProjectDAO:
         with open(new_csv_path, "w") as file:
             writer = DictWriter(file, out_fieldnames)
             writer.writeheader()
-            pbar = tqdm(total = len(task_dicts), desc = "Creating tasks")
+            pbar = tqdm(total=len(task_dicts), desc="Creating tasks")
             for task_dict in task_dicts:
                 try:
                     task = MRITask.from_csv_row(root_path, task_dict)
                     task_id = task_dao.create_task(
                         task, project_id, img_server_url, root_path
                     )
-                    print(task_id)
                     # Add information to output dict
                     task_dict["ls_project_id"] = project_id
                     task_dict["ls_task_id"] = task_id
@@ -364,12 +369,17 @@ class ProjectDAO:
                         "right_sagittal", None
                     )
                     task_dict["left_axial"] = task.crop_details.get("left_axial", None)
-                    task_dict["right_axial"] = task.crop_details.get("right_axial", None)
+                    task_dict["right_axial"] = task.crop_details.get(
+                        "right_axial", None
+                    )
                     writer.writerow(task_dict)
                     pbar.update()
                 except Exception as e:
-                    print(e)
-                    print(f"Failed to create task for {task_dict['anonPatientId']}/{task_dict['anonExaminationStudyId']}")
+                    print(traceback.print_exc())
+                    print(
+                        f"Failed to create task for {task_dict['anonPatientId']}/{task_dict['anonExaminationStudyId']}"
+                    )
+
     def export_tasks_from_csv(self, tasks_csv_path: str, images_csv_path: str):
         root_path, csv_name = os.path.split(tasks_csv_path)
         task_dao = TaskDAO(self.connector)

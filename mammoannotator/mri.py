@@ -25,7 +25,7 @@ class RawImage:
     image_path: str
     width: int  # pixels
     height: int  # pixels
-    ratio: float # w/h if h is 0, then ratio is 0.
+    ratio: float  # w/h if h is 0, then ratio is 0.
     laterality: str
     view: str
     image: np.array
@@ -37,9 +37,9 @@ class RawImage:
     def measure(im: Image):
         im = np.array(im)
         h, w = im.shape
-        ratio = w/h if h != 0 else 0
+        ratio = w / h if h != 0 else 0
         return w, h, ratio
-    
+
     @classmethod
     def from_path(cls, path: str):
         basename = os.path.basename(path)
@@ -47,11 +47,13 @@ class RawImage:
         with Image.open(path) as im:
             w, h, ratio = cls.measure(im)
             image = np.array(im)
-        
+
         # sanity checks
         assert image.shape[0] > image.shape[1], f"Horizontal image: {path}"
-        assert 0.1 < ratio < 0.9, f"Ratio for image {path} is too high or too low. Ratio: {ratio}"
-        
+        assert (
+            0.1 < ratio < 0.9
+        ), f"Ratio for image {path} is too high or too low. Ratio: {ratio}"
+
         white_start = cls.find_white_start(image)
         return cls(
             laterality=lat,
@@ -61,7 +63,7 @@ class RawImage:
             white_start=white_start,
             width=w,
             height=h,
-            ratio=ratio
+            ratio=ratio,
         )
 
     @classmethod
@@ -69,8 +71,8 @@ class RawImage:
         """get the vertical position where the average intensity is higher than cls.margin for the first time (top to bottom)"""
         w = image.shape[-1]
         # use only the central strip bc there are annotations on the corner sometimes
-        c_start, c_end = 2*w//5, 3*w//3 
-        row_max = np.mean(image[:,c_start:c_end], axis=-1)
+        c_start, c_end = 2 * w // 5, 3 * w // 3
+        row_max = np.mean(image[:, c_start:c_end], axis=-1)
         return np.argwhere(row_max > cls.white_threshold)[0][0]
 
     @staticmethod
@@ -84,7 +86,9 @@ class RawImage:
         elif laterality == "r":
             laterality = "right"
         else:
-            raise Exception(f"For {fn}, laterality is '{laterality}' instead of 'l' or 'r'")
+            raise Exception(
+                f"For {fn}, laterality is '{laterality}' instead of 'l' or 'r'"
+            )
 
         view = parts[-1]
         if view == "Sag":
@@ -108,9 +112,9 @@ class CroppedImage:
     image_path: str
     original_width: int
     original_height: int
-    
+
     # Class configurations. Sorry for hard coding!
-    side_size = 360 # size of the output square
+    side_size = 360  # size of the output square
     margin = 0.0277  # compared to the original height (~20px when 720px)
 
     @classmethod
@@ -119,14 +123,14 @@ class CroppedImage:
         margin_px = round(raw_image.height * cls.margin)
         # never start in a negative position
         start = max(raw_image.white_start - margin_px, 0)
-        # latest start to be able to crop a "square" 
+        # latest start to be able to crop a "square"
         # (square after it is resized and considering it will have a 0.5 aspect ratio)
         start = min(start, raw_image.height // 2)
-        end = start + raw_image.heigh // 2
+        end = start + raw_image.height // 2
         return start, end
 
     @staticmethod
-    def rotate_and_flip(image:np.array, laterality: str, view: str):
+    def rotate_and_flip(image: np.array, laterality: str, view: str):
         rotate, flip = 0, False
         if laterality == "right":
             rotate = 90 // 90  # one time counterclockwise
@@ -146,10 +150,13 @@ class CroppedImage:
         crop_start, crop_end = cls.get_crop_positions(raw_image)
         image = image[crop_start:crop_end, :]
         # Rotate and flip
-        image, rotate, flip = cls.rotate_and_flip(image, raw_image.laterality, raw_image.view)
+        image, rotate, flip = cls.rotate_and_flip(
+            image, raw_image.laterality, raw_image.view
+        )
         # Resize to get a square of constant size even if the ratio was wrong
         im = Image.fromarray(image)
-        im = im.resize([cls.side_size,cls.side_size])
+        im = im.resize([cls.side_size, cls.side_size])
+        image = np.array(im)
         # Save the newly created image
         path, fn = os.path.split(raw_image.image_path)
         im_name, extension = os.path.splitext(fn)
@@ -178,6 +185,8 @@ class CroppedImage:
             crop_end=int(self.crop_end),
             rotation=int(self.rotation),
             flip=self.flip,
+            original_width=int(self.original_width),
+            original_height=int(self.original_height),
         )
 
 
@@ -190,6 +199,7 @@ class MRITask:
     crops: Dict[Tuple[str, str], CroppedImage]
     crop_details: Dict[str, Dict[str, Union[int, bool]]]
     assessment: str
+    mammoannotator_version: str
 
     @classmethod
     def from_root_folder(cls, root_path: str) -> List["MRITask"]:
@@ -256,11 +266,11 @@ class MRITask:
             frames[(cropped_image.laterality, cropped_image.view)] = cropped_image
 
         # Define the size of the square
-        for i in raw_shapes[1:]:
-            assert np.all(
-                i == raw_shapes[0]
-            ), f"Image with different shape: {study_path}"
-        n_px = raw_shapes[0][1]
+        # for i in raw_shapes[1:]:
+        #     assert np.all(
+        #         i == raw_shapes[0]
+        #     ), f"Image with different shape: {study_path}"
+        n_px = CroppedImage.side_size
 
         # build a new image with all four scans
         full_image = np.zeros([2 * n_px, 2 * n_px], dtype=np.uint8)
@@ -314,4 +324,3 @@ class MRITask:
         rel_path = os.path.relpath(self.image_path, server_root)
         img_url = f"{url}/{rel_path}"
         self.image_path = img_url
-
