@@ -23,21 +23,35 @@ def list_files(folder_path: str, extension: str) -> List[str]:
 @dataclass
 class RawImage:
     image_path: str
+    width: int  # pixels
+    height: int  # pixels
+    ratio: float # w/h if h is 0, then ratio is 0.
     laterality: str
     view: str
     image: np.array
     white_start: int  # from top to down, where is the
     # first row with a value higher than white_threshold
-
     white_threshold = 50
 
+    @staticmethod
+    def measure(im: Image):
+        im = np.array(im)
+        h, w = im.shape
+        ratio = w/h if h != 0 else 0
+        return w, h, ratio
+    
     @classmethod
     def from_path(cls, path: str):
         basename = os.path.basename(path)
         lat, view = cls.parse_file_name(basename)
         with Image.open(path) as im:
+            w, h, ratio = cls.measure(im)
             image = np.array(im)
-        assert image.shape[0] > image.shape[1], f"horizontal image: {path}"
+        
+        # sanity checks
+        assert image.shape[0] > image.shape[1], f"Horizontal image: {path}"
+        assert 0.1 < ratio < 0.9, f"Ratio for image {path} is too high or too low. Ratio: {ratio}"
+        
         white_start = cls.find_white_start(image)
         return cls(
             laterality=lat,
@@ -45,16 +59,23 @@ class RawImage:
             image_path=path,
             image=image,
             white_start=white_start,
+            width=w,
+            height=h,
+            ratio=ratio
         )
 
     @classmethod
-    def find_white_start(cls, image):
-        row_max = np.max(image, axis=-1)
+    def find_white_start(cls, image: np.array):
+        """get the vertical position where the average intensity is higher than cls.margin for the first time (top to bottom)"""
+        w = image.shape[-1]
+        # use only the central strip bc there are annotations on the corner sometimes
+        c_start, c_end = 2*w//5, 3*w//3 
+        row_max = np.mean(image[:,c_start:c_end], axis=-1)
         return np.argwhere(row_max > cls.white_threshold)[0][0]
 
     @staticmethod
     def parse_file_name(fn: str) -> Tuple[str, str]:
-        root, extension = os.path.splitext(fn)
+        root, _ = os.path.splitext(fn)
         parts = root.split("_")
 
         laterality = parts[-2]
@@ -85,30 +106,51 @@ class CroppedImage:
     flip: bool
     image: np.array
     image_path: str
-
-    margin = 20  # pixels
+    original_width: int
+    original_height: int
+    
+    # Class configurations. Sorry for hard coding!
+    side_size = 360 # size of the output square
+    margin = 0.0277  # compared to the original height (~20px when 720px)
 
     @classmethod
-    def from_raw_image(cls, raw_image: RawImage):
-        image = raw_image.image
-        crop_start = max(raw_image.white_start - cls.margin, 0)
-        crop_start = min(
-            crop_start, image.shape[0] - image.shape[1]
-        )  # latest start to be able to get a square
-        crop_end = crop_start + image.shape[1]
-        image = image[crop_start:crop_end, :]
+    def get_crop_positions(cls, raw_image: RawImage):
+        """obtain the vertical positions to start and end the crop"""
+        margin_px = round(raw_image.height * cls.margin)
+        # never start in a negative position
+        start = max(raw_image.white_start - margin_px, 0)
+        # latest start to be able to crop a "square" 
+        # (square after it is resized and considering it will have a 0.5 aspect ratio)
+        start = min(start, raw_image.height // 2)
+        end = start + raw_image.heigh // 2
+        return start, end
+
+    @staticmethod
+    def rotate_and_flip(image:np.array, laterality: str, view: str):
         rotate, flip = 0, False
-        if raw_image.laterality == "right":
+        if laterality == "right":
             rotate = 90 // 90  # one time counterclockwise
             image = np.rot90(image, k=rotate)
-            if raw_image.view == "sagittal":
+            if view == "sagittal":
                 flip = True
                 image = np.flip(image, axis=0)
         else:
             rotate = 270 // 90  # three times counterclockwise
             image = np.rot90(image, k=rotate)
+        return image, rotate, flip
 
+    @classmethod
+    def from_raw_image(cls, raw_image: RawImage):
+        image = raw_image.image
+        # Crop image
+        crop_start, crop_end = cls.get_crop_positions(raw_image)
+        image = image[crop_start:crop_end, :]
+        # Rotate and flip
+        image, rotate, flip = cls.rotate_and_flip(image, raw_image.laterality, raw_image.view)
+        # Resize to get a square of constant size even if the ratio was wrong
         im = Image.fromarray(image)
+        im = im.resize([cls.side_size,cls.side_size])
+        # Save the newly created image
         path, fn = os.path.split(raw_image.image_path)
         im_name, extension = os.path.splitext(fn)
         crops_path = os.path.join(path, "crops")
@@ -116,7 +158,7 @@ class CroppedImage:
             os.mkdir(crops_path)
         full_path = os.path.join(crops_path, f"{im_name}_crop{extension}")
         im.save(full_path)
-
+        # Create a class
         return cls(
             image=image,
             crop_start=crop_start,
@@ -126,6 +168,8 @@ class CroppedImage:
             image_path=full_path,
             rotation=rotate,
             flip=flip,
+            original_width=raw_image.width,
+            original_height=raw_image.height,
         )
 
     def get_crop_details(self):
