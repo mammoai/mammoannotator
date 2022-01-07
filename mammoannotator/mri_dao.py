@@ -15,7 +15,7 @@ from PIL import Image
 from tqdm.auto import tqdm
 
 from mammoannotator.labelstudio_api import LabelStudioAPI
-from mammoannotator.mri import MRITask, list_files
+from mammoannotator.mri import MRITask, list_files, RawImage
 
 
 def create_dir_if_missing(path):
@@ -24,6 +24,7 @@ def create_dir_if_missing(path):
 
 
 def merge_images(image_paths, output_path) -> str:
+    # TODO: split io from logic
     """
     image_paths are expected to be binary images. Creates the union of all the
     images and stores it in output_path.
@@ -51,20 +52,24 @@ def slice_arr_by_lat_view(arr, lat_view, width: int):
 
 
 def reverse_crop(
-    im_arr: np.array, crop_details: dict
-) -> Dict[str, Tuple[Image.Image, int]]:
+    im: Image, crop_details: dict
+) -> Dict[str, Tuple[Image, int]]:
     """Return the recovered image and the number of annotated pixels per
     lat_view. If the lat_view annotation has no annotations, nothing is added
-    for that image."""
-    width = 360
-    height = 720  # TODO: add this variable to crop details and read it from there
+    for that image. 
+    The images are usually of size mammoannotator.mri.CroppedImage.side_size 
+    but their original height and width can be recovered from the crop_details."""
+    width, height, _  = RawImage.measure(im)
+    im_array = np.array(im)
     recovered_images = {}
     for lat_view, details in crop_details.items():
-        lat_view_arr = slice_arr_by_lat_view(im_arr, lat_view, width)
+        lat_view_arr = slice_arr_by_lat_view(im_array, lat_view, width)
         lat_view_arr[lat_view_arr < 0] = 255
         annotated_pixels = np.count_nonzero(lat_view_arr)
         if annotated_pixels == 0:
             continue  # no annotations on this lat_view -> skip
+        # reverse resize
+        # TODO: this should be implemented with similar methods as in CroppedImage
         # reverse flip
         if details["flip"]:
             lat_view_arr = np.flip(lat_view_arr, axis=0)
@@ -169,7 +174,7 @@ class TaskDAO:
             else:
                 raise TypeError(f"Unkown extension of file: {task_file}")
             all_images
-            # Run quality checks
+            # TODO: Run quality checks
             ## No annotations in the edge.
             ## Empty Pixels that are fully surrounded by annotatated pixels.
             ## Annotations in black areas.
@@ -207,16 +212,15 @@ class TaskDAO:
                     safe_label = label.replace(" ", "_")
                     new_name = f"p-{project_id}-t-{task_id}-a-{a_id}-all_views-{safe_label}.png"
                     new_filepath = os.path.join(annot_all_views_folder, new_name)
-                    if l == 1:  # Rename and move file to folder
+                    if l == 1:  # Only one image for this label. Simply rename and move file to folder.
                         os.rename(images[0], new_filepath)
-                    elif l > 1:
+                    elif l > 1: # More than one image for the same image, create the union of all positive pixels
                         merge_images(images, new_filepath)
                     else:
                         raise IndexError(
                             f"Found {l} images in annotation{a_id} - label {label}"
                         )
                     with Image.open(new_filepath) as im:
-                        im_array = np.array(im)
                         output_list.append(
                             dict(
                                 project_id=project_id,
@@ -229,7 +233,7 @@ class TaskDAO:
                             )
                         )
                         # Recover original shape by reversing the crop
-                        recovered = reverse_crop(im_array, annotation["crop_details"])
+                        recovered = reverse_crop(im, annotation["crop_details"])
                     for lat_view, (im, pixel_count) in recovered.items():
                         lat_view_folder = os.path.join(annotation_folder, lat_view)
                         create_dir_if_missing(lat_view_folder)
