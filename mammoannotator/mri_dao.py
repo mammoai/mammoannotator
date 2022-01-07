@@ -92,7 +92,6 @@ class TaskDAO:
 
     @staticmethod
     def _parse_image_filename(filename: str) -> Tuple[int, int, str, str]:
-        # TODO: convert this script to maintainable classes and functions
         """Parse the name of an image that was downloaded from LS.
 
         Args:
@@ -111,7 +110,6 @@ class TaskDAO:
             result.group("email"),
             result.group("label"),
         )
-        result
         return result
 
     def get_task_annotations(
@@ -381,6 +379,10 @@ class ProjectDAO:
                     )
 
     def export_tasks_from_csv(self, tasks_csv_path: str, images_csv_path: str):
+        """
+        task_csv_path: csv that was created with this same class
+        images_csv_path: output csv that describes the images of the annotations.
+        """
         root_path, csv_name = os.path.split(tasks_csv_path)
         task_dao = TaskDAO(self.connector)
         with open(tasks_csv_path) as input_csv:
@@ -415,4 +417,5 @@ class ProjectDAO:
                 image_rows = task_dao.get_task_annotations(
                     project_id=project_id, task_id=task_id, study_path=study_folder
                 )
+                # TODO: missing view and laterality!!!
                 writer.writerows(image_rows)
