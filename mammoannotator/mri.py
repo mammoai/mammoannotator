@@ -3,6 +3,7 @@ import logging
 import os
 from dataclasses import asdict, dataclass
 from typing import Dict, List, Tuple, Union
+import mammoannotator
 
 import numpy as np
 from PIL import Image
@@ -302,6 +303,7 @@ class MRITask:
             image_path=fp,
             crops=Dict[Tuple[str, str], CroppedImage],
             crop_details=crop_details,
+            mammoannotator_version=mammoannotator.__version__
         )
 
     @classmethod
