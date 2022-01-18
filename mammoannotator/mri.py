@@ -3,10 +3,11 @@ import logging
 import os
 from dataclasses import asdict, dataclass
 from typing import Dict, List, Tuple, Union
-import mammoannotator
 
 import numpy as np
 from PIL import Image
+
+import mammoannotator
 
 
 def list_dirs(path: str) -> List[str]:
@@ -16,9 +17,18 @@ def list_dirs(path: str) -> List[str]:
 
 
 def list_files(folder_path: str, extension: str) -> List[str]:
-    """get paths of files ending with <extension> in a folder"""
-    filenames = [f for f in os.listdir(folder_path) if f.endswith(extension)]
+    """get paths of files with <extension> in a folder"""
+    filenames = []
+    extension = f".{extension}" if not extension.startswith(".") else extension
+    for f in os.listdir(folder_path):
+        if os.path.splitext(f)[1] == extension:
+            filenames.append(f)
     return sorted([os.path.join(folder_path, f) for f in filenames])
+
+
+def ensure_folder_exists(folder_path: str):
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
 
 
 @dataclass
@@ -43,6 +53,11 @@ class RawImage:
 
     @classmethod
     def from_path(cls, path: str):
+        assert os.path.splitext(path)[1].lower() in [
+            ".jpeg",
+            ".jpg",
+            ".png",
+        ], f"The extension of image {path} must be jpg, jpeg or png"
         basename = os.path.basename(path)
         lat, view = cls.parse_file_name(basename)
         with Image.open(path) as im:
@@ -108,7 +123,8 @@ class CroppedImage:
     crop_start: int
     crop_end: int
     rotation: int
-    flip: bool
+    h_flip: bool
+    v_flip: bool
     image: np.array
     image_path: str
     original_width: int
@@ -131,18 +147,55 @@ class CroppedImage:
         return start, end
 
     @staticmethod
-    def rotate_and_flip(image: np.array, laterality: str, view: str):
-        rotate, flip = 0, False
-        if laterality == "right":
-            rotate = 90 // 90  # one time counterclockwise
+    def mod_rules(laterality: str, view: str):
+        """explicitly set the rules for modifying each combination of laterality and view.
+        it is expected that they are done in order (first rotate, then h_flip, then v_flip)
+        returns a dict with keys
+            rotate: <int> number of counterclockwise rotations of 90 degrees,
+            h_flip: <bool> if the image should be flipped horizontally (d -> b)
+            v_flip: <bool> if the image should be flipped vertically (p -> b)
+        """
+        R = "right"
+        L = "left"
+        S = "sagittal"
+        A = "axial"
+        _1 = True
+        _0 = False
+        default_rules = {
+            (R, S): {"rotate": 1, "h_flip": _0, "v_flip": _0},
+            (R, A): {"rotate": 1, "h_flip": _0, "v_flip": _0},
+            (L, S): {"rotate": 3, "h_flip": _0, "v_flip": _1},
+            (L, A): {"rotate": 3, "h_flip": _0, "v_flip": _0},
+        }
+        return default_rules[(laterality, view)]
+
+    @staticmethod
+    def rotate_and_flip(image: np.array, rotate: int, h_flip: bool, v_flip: bool):
+        """rotates, and flips the image"""
+        
+        if rotate > 0:
             image = np.rot90(image, k=rotate)
-            if view == "sagittal":
-                flip = True
-                image = np.flip(image, axis=0)
-        else:
-            rotate = 270 // 90  # three times counterclockwise
-            image = np.rot90(image, k=rotate)
-        return image, rotate, flip
+        if h_flip:
+            image = np.flip(image, axis=1)
+        if v_flip:
+            image = np.flip(image, axis=0)
+        return image
+
+    @staticmethod
+    def get_crops_folder_path(raw_image: RawImage):
+        path, _ = os.path.split(raw_image.image_path)
+        crops_path = os.path.join(path, "crops")
+        ensure_folder_exists(crops_path)
+        return crops_path
+
+    @staticmethod
+    def get_image_path(raw_image: RawImage):
+        crops_path = CroppedImage.get_crops_folder_path(raw_image)
+        _, fn = os.path.split(raw_image.image_path)
+        im_name, extension = os.path.splitext(fn)
+        image_filename = f"{im_name}_crop{extension}"
+        full_image_path = os.path.join(crops_path, image_filename)
+        return full_image_path
 
     @classmethod
     def from_raw_image(cls, raw_image: RawImage):
@@ -151,20 +204,15 @@ class CroppedImage:
         crop_start, crop_end = cls.get_crop_positions(raw_image)
         image = image[crop_start:crop_end, :]
         # Rotate and flip
-        image, rotate, flip = cls.rotate_and_flip(
-            image, raw_image.laterality, raw_image.view
-        )
+        mods = CroppedImage.mod_rules(raw_image.laterality, raw_image.view)
+        image = cls.rotate_and_flip(image, **mods)
+        rotate, h_flip, v_flip = mods.values()
         # Resize to get a square of constant size even if the ratio was wrong
         im = Image.fromarray(image)
         im = im.resize([cls.side_size, cls.side_size])
         image = np.array(im)
         # Save the newly created image
-        path, fn = os.path.split(raw_image.image_path)
-        im_name, extension = os.path.splitext(fn)
-        crops_path = os.path.join(path, "crops")
-        if not os.path.exists(os.path.join(path, "crops")):
-            os.mkdir(crops_path)
-        full_path = os.path.join(crops_path, f"{im_name}_crop{extension}")
+        full_path = cls.get_image_path(raw_image)
         im.save(full_path)
         # Create a class
         return cls(
@@ -175,7 +223,8 @@ class CroppedImage:
             view=raw_image.view,
             image_path=full_path,
             rotation=rotate,
-            flip=flip,
+            h_flip=h_flip,
+            v_flip=v_flip,
             original_width=raw_image.width,
             original_height=raw_image.height,
         )
@@ -185,7 +234,8 @@ class CroppedImage:
             crop_start=int(self.crop_start),
             crop_end=int(self.crop_end),
             rotation=int(self.rotation),
-            flip=self.flip,
+            h_flip=self.h_flip,
+            v_flip=self.v_flip,
             original_width=int(self.original_width),
             original_height=int(self.original_height),
         )
@@ -195,12 +245,12 @@ class CroppedImage:
 class MRITask:
     patient_id: str
     study_id: str
-    assessment: str
     image_path: str
     crops: Dict[Tuple[str, str], CroppedImage]
     crop_details: Dict[str, Dict[str, Union[int, bool]]]
-    assessment: str
     mammoannotator_version: str
+    assessment: str = "" # set with csv
+    examination_timestamp: str = "" #set with csv
 
     @classmethod
     def from_root_folder(cls, root_path: str) -> List["MRITask"]:
@@ -225,27 +275,6 @@ class MRITask:
             crop.image if crop is not None else np.zeros([n_px, n_px], dtype=np.uint8)
         )
         return crop
-
-    def set_assessment_from_csv(self, df):
-        row = df[
-            (df["anonExaminationStudyId"] == self.study_id)
-            & (df["anonPatientId"] == self.patient_id)
-        ]
-        if len(row) == 0:
-            print(
-                f"could not find row in assessment csv for study: {self.study_id} and patient: {self.patient_id}"
-            )
-            self.assessment = "Not found in csv"
-            return
-        elif len(row) > 1:
-            print(
-                f"more than one row in assessment csv for study: {self.study_id} and patient: {self.patient_id}"
-            )
-            self.assessment = "More than one found in csv"
-            return
-        assessment = row["ReportTextText"].values[0]
-        assert isinstance(assessment, str), f"Assessment is not str: {assessment}"
-        self.assessment = assessment
 
     @classmethod
     def from_study_folder(cls, study_path: str) -> "MRITask":
@@ -282,7 +311,6 @@ class MRITask:
 
         # get details
         patient_id, study_id = study_path.split(os.sep)[-2:]
-        assesment = ""
         crop_details = {
             f"{lat}_{view}": cropped_image.get_crop_details()
             for (lat, view), cropped_image in frames.items()
@@ -299,11 +327,10 @@ class MRITask:
         return cls(
             patient_id=patient_id,
             study_id=study_id,
-            assessment=assesment,
             image_path=fp,
             crops=Dict[Tuple[str, str], CroppedImage],
             crop_details=crop_details,
-            mammoannotator_version=mammoannotator.__version__
+            mammoannotator_version=mammoannotator.__version__,
         )
 
     @classmethod
@@ -315,6 +342,7 @@ class MRITask:
         assert os.path.exists(study_path), f"Study path not found: {study_path}"
         task = cls.from_study_folder(study_path)
         task.assessment = row["ReportTextText"]
+        task.examination_timestamp = row['ExaminationDate']
         return task
 
     def as_dict(self):

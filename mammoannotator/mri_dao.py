@@ -53,7 +53,7 @@ def slice_arr_by_lat_view(arr, lat_view, width: int):
 
 def reverse_crop(
     im: Image, crop_details: dict
-) -> Dict[str, Tuple[Image, int]]:
+) -> Dict[str, Tuple[Image.Image, int]]:
     """Return the recovered image and the number of annotated pixels per
     lat_view. If the lat_view annotation has no annotations, nothing is added
     for that image. 
@@ -228,7 +228,7 @@ class TaskDAO:
                                 annotation_id=a_id,
                                 view="all_views",
                                 label=safe_label,
-                                annotated_pixels=np.count_nonzero(im_array),
+                                annotated_pixels=np.count_nonzero(im),
                                 image_path=new_filepath,
                             )
                         )
@@ -282,7 +282,7 @@ class ProjectDAO:
             expert_instruction=instructions,
             created_by={"first_name": "Admin", "last_name": "", "email": ""},
             show_instruction=True,
-            show_skip_button=True,
+            show_skip_button=False,
             enable_empty_annotation=False,
         )
         return project["id"]
@@ -319,6 +319,7 @@ class ProjectDAO:
             assert "anonPatientId" in fields
             assert "anonExaminationStudyId" in fields
             assert "ReportTextText" in fields
+            assert "ExaminationDate" in fields
             for row in reader:
                 try:
                     assert os.path.exists(
@@ -357,11 +358,13 @@ class ProjectDAO:
             pbar = tqdm(total=len(task_dicts), desc="Creating tasks")
             for task_dict in task_dicts:
                 try:
+                    # Create task
                     task = MRITask.from_csv_row(root_path, task_dict)
+                    # Send task to LS
                     task_id = task_dao.create_task(
                         task, project_id, img_server_url, root_path
                     )
-                    # Add information to output dict
+                    # Add information to output_csv (row) dict
                     task_dict["ls_project_id"] = project_id
                     task_dict["ls_task_id"] = task_id
                     task_dict["left_sagittal"] = task.crop_details.get(

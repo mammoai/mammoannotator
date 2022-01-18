@@ -42,7 +42,7 @@ class LabelStudioAPI:
 
     def list_projects(self):
         """Return a list of the projects that you've created"""
-        response = self._get_projects_request()
+        response = self._get_projects()
         self._check_status_code(response, 200)
         return response.json()
 
@@ -55,6 +55,11 @@ class LabelStudioAPI:
     def get_project_id_by_title(self, title):
         """Get the id of the first project that matches the title"""
         return self._get_project_by_title(title)["id"]
+
+    def delete_project(self, project_id):
+        url = f"{self.url}/api/projects/{project_id}"
+        response = requests.delete(url=url, headers=self.headers())
+        self._check_status_code(response, 204)
 
     def create_project(
         self,
