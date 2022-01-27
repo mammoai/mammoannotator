@@ -4,6 +4,7 @@ from argparse import ArgumentParser
 
 from mammoannotator.labelstudio_api import LabelStudioAPI
 from mammoannotator.mri_dao import ProjectDAO
+import mammoannotator
 
 
 def create_project(raw_args):
@@ -68,6 +69,14 @@ def export_csv(raw_args):
 
 def main(raw_args=sys.argv[1:]):
     parser = ArgumentParser()
+    
+    # Version command
+    parser.add_argument('--version','-v', action='store_true')
+    args, other_args = parser.parse_known_args(raw_args)
+    if args.version:
+        print(mammoannotator.__version__)
+        return
+
     parser.add_argument("action", choices=["project", "check", "export"])
     args, other_args = parser.parse_known_args(raw_args)
     action_map = {

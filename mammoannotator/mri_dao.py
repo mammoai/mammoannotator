@@ -3,6 +3,7 @@ import json
 import os
 import re
 import sys
+import traceback
 import zipfile
 from csv import DictReader, DictWriter
 from datetime import datetime
@@ -14,7 +15,7 @@ from PIL import Image
 from tqdm.auto import tqdm
 
 from mammoannotator.labelstudio_api import LabelStudioAPI
-from mammoannotator.mri import MRITask, list_files
+from mammoannotator.mri import MRITask, list_files, RawImage
 
 
 def create_dir_if_missing(path):
@@ -23,6 +24,7 @@ def create_dir_if_missing(path):
 
 
 def merge_images(image_paths, output_path) -> str:
+    # TODO: split io from logic
     """
     image_paths are expected to be binary images. Creates the union of all the
     images and stores it in output_path.
@@ -50,20 +52,24 @@ def slice_arr_by_lat_view(arr, lat_view, width: int):
 
 
 def reverse_crop(
-    im_arr: np.array, crop_details: dict
+    im: Image, crop_details: dict
 ) -> Dict[str, Tuple[Image.Image, int]]:
     """Return the recovered image and the number of annotated pixels per
     lat_view. If the lat_view annotation has no annotations, nothing is added
-    for that image."""
-    width = 360
-    height = 720  # TODO: add this variable to crop details and read it from there
+    for that image. 
+    The images are usually of size mammoannotator.mri.CroppedImage.side_size 
+    but their original height and width can be recovered from the crop_details."""
+    width, height, _  = RawImage.measure(im)
+    im_array = np.array(im)
     recovered_images = {}
     for lat_view, details in crop_details.items():
-        lat_view_arr = slice_arr_by_lat_view(im_arr, lat_view, width)
+        lat_view_arr = slice_arr_by_lat_view(im_array, lat_view, width)
         lat_view_arr[lat_view_arr < 0] = 255
         annotated_pixels = np.count_nonzero(lat_view_arr)
         if annotated_pixels == 0:
             continue  # no annotations on this lat_view -> skip
+        # reverse resize
+        # TODO: this should be implemented with similar methods as in CroppedImage
         # reverse flip
         if details["flip"]:
             lat_view_arr = np.flip(lat_view_arr, axis=0)
@@ -91,7 +97,6 @@ class TaskDAO:
 
     @staticmethod
     def _parse_image_filename(filename: str) -> Tuple[int, int, str, str]:
-        # TODO: convert this script to maintainable classes and functions
         """Parse the name of an image that was downloaded from LS.
 
         Args:
@@ -110,7 +115,6 @@ class TaskDAO:
             result.group("email"),
             result.group("label"),
         )
-        result
         return result
 
     def get_task_annotations(
@@ -170,7 +174,7 @@ class TaskDAO:
             else:
                 raise TypeError(f"Unkown extension of file: {task_file}")
             all_images
-            # Run quality checks
+            # TODO: Run quality checks
             ## No annotations in the edge.
             ## Empty Pixels that are fully surrounded by annotatated pixels.
             ## Annotations in black areas.
@@ -208,16 +212,15 @@ class TaskDAO:
                     safe_label = label.replace(" ", "_")
                     new_name = f"p-{project_id}-t-{task_id}-a-{a_id}-all_views-{safe_label}.png"
                     new_filepath = os.path.join(annot_all_views_folder, new_name)
-                    if l == 1:  # Rename and move file to folder
+                    if l == 1:  # Only one image for this label. Simply rename and move file to folder.
                         os.rename(images[0], new_filepath)
-                    elif l > 1:
+                    elif l > 1: # More than one image for the same image, create the union of all positive pixels
                         merge_images(images, new_filepath)
                     else:
                         raise IndexError(
                             f"Found {l} images in annotation{a_id} - label {label}"
                         )
                     with Image.open(new_filepath) as im:
-                        im_array = np.array(im)
                         output_list.append(
                             dict(
                                 project_id=project_id,
@@ -225,12 +228,12 @@ class TaskDAO:
                                 annotation_id=a_id,
                                 view="all_views",
                                 label=safe_label,
-                                annotated_pixels=np.count_nonzero(im_array),
+                                annotated_pixels=np.count_nonzero(im),
                                 image_path=new_filepath,
                             )
                         )
                         # Recover original shape by reversing the crop
-                        recovered = reverse_crop(im_array, annotation["crop_details"])
+                        recovered = reverse_crop(im, annotation["crop_details"])
                     for lat_view, (im, pixel_count) in recovered.items():
                         lat_view_folder = os.path.join(annotation_folder, lat_view)
                         create_dir_if_missing(lat_view_folder)
@@ -279,7 +282,7 @@ class ProjectDAO:
             expert_instruction=instructions,
             created_by={"first_name": "Admin", "last_name": "", "email": ""},
             show_instruction=True,
-            show_skip_button=True,
+            show_skip_button=False,
             enable_empty_annotation=False,
         )
         return project["id"]
@@ -316,16 +319,22 @@ class ProjectDAO:
             assert "anonPatientId" in fields
             assert "anonExaminationStudyId" in fields
             assert "ReportTextText" in fields
+            assert "ExaminationDate" in fields
             for row in reader:
                 try:
                     assert os.path.exists(
                         os.path.join(
-                            root_path, row["anonPatientId"], row["anonExaminationStudyId"]
+                            root_path,
+                            row["anonPatientId"],
+                            row["anonExaminationStudyId"],
                         )
                     ), f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist"
                     task_dicts.append(row)
                 except:
-                    print(f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist")
+                    print(
+                        f"{row['anonPatientId']}/{row['anonExaminationStudyId']} does not exist"
+                    )
+
         # create project
         print(f"Creating {title} {description}")
         project_id = self.create_project(
@@ -346,15 +355,16 @@ class ProjectDAO:
         with open(new_csv_path, "w") as file:
             writer = DictWriter(file, out_fieldnames)
             writer.writeheader()
-            pbar = tqdm(total = len(task_dicts), desc = "Creating tasks")
+            pbar = tqdm(total=len(task_dicts), desc="Creating tasks")
             for task_dict in task_dicts:
                 try:
+                    # Create task
                     task = MRITask.from_csv_row(root_path, task_dict)
+                    # Send task to LS
                     task_id = task_dao.create_task(
                         task, project_id, img_server_url, root_path
                     )
-                    print(task_id)
-                    # Add information to output dict
+                    # Add information to output_csv (row) dict
                     task_dict["ls_project_id"] = project_id
                     task_dict["ls_task_id"] = task_id
                     task_dict["left_sagittal"] = task.crop_details.get(
@@ -364,13 +374,22 @@ class ProjectDAO:
                         "right_sagittal", None
                     )
                     task_dict["left_axial"] = task.crop_details.get("left_axial", None)
-                    task_dict["right_axial"] = task.crop_details.get("right_axial", None)
+                    task_dict["right_axial"] = task.crop_details.get(
+                        "right_axial", None
+                    )
                     writer.writerow(task_dict)
                     pbar.update()
                 except Exception as e:
-                    print(e)
-                    print(f"Failed to create task for {task_dict['anonPatientId']}/{task_dict['anonExaminationStudyId']}")
+                    print(traceback.print_exc())
+                    print(
+                        f"Failed to create task for {task_dict['anonPatientId']}/{task_dict['anonExaminationStudyId']}"
+                    )
+
     def export_tasks_from_csv(self, tasks_csv_path: str, images_csv_path: str):
+        """
+        task_csv_path: csv that was created with this same class
+        images_csv_path: output csv that describes the images of the annotations.
+        """
         root_path, csv_name = os.path.split(tasks_csv_path)
         task_dao = TaskDAO(self.connector)
         with open(tasks_csv_path) as input_csv:
@@ -405,4 +424,5 @@ class ProjectDAO:
                 image_rows = task_dao.get_task_annotations(
                     project_id=project_id, task_id=task_id, study_path=study_folder
                 )
+                # TODO: missing view and laterality!!!
                 writer.writerows(image_rows)
