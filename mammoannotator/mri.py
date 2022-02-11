@@ -42,7 +42,7 @@ class RawImage:
     image: np.array
     white_start: int  # from top to down, where is the
     # first row with a value higher than white_threshold
-    white_threshold = 50
+    white_threshold = 20
 
     @staticmethod
     def measure(im: Image):
@@ -87,7 +87,7 @@ class RawImage:
         """get the vertical position where the average intensity is higher than cls.margin for the first time (top to bottom)"""
         w = image.shape[-1]
         # use only the central strip bc there are annotations on the corner sometimes
-        c_start, c_end = 2 * w // 5, 3 * w // 3
+        c_start, c_end = 2 * w // 5, 3 * w // 5
         row_max = np.mean(image[:, c_start:c_end], axis=-1)
         return np.argwhere(row_max > cls.white_threshold)[0][0]
 
@@ -163,8 +163,8 @@ class CroppedImage:
         _0 = False
         default_rules = {
             (R, S): {"rotate": 1, "h_flip": _0, "v_flip": _0},
-            (R, A): {"rotate": 1, "h_flip": _0, "v_flip": _0},
-            (L, S): {"rotate": 3, "h_flip": _0, "v_flip": _1},
+            (R, A): {"rotate": 1, "h_flip": _0, "v_flip": _1},
+            (L, S): {"rotate": 3, "h_flip": _0, "v_flip": _0},
             (L, A): {"rotate": 3, "h_flip": _0, "v_flip": _0},
         }
         return default_rules[(laterality, view)]
