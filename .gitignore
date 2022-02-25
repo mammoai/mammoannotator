@@ -128,3 +128,4 @@ cython_debug/
 scratch/
 
 .DS_Store
+processed_images/

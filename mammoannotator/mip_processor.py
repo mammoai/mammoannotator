@@ -4,18 +4,23 @@ from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-import plotly.graph_objects as go
 import pydicom
 from mammoannotator.mri import list_files
-from PIL import Image
 from pydicom import dcmread
 import cv2
+
+from coma_db.mongo_dao import ImageMetadataDao
 
 # temp just for debugging
 window_center_val = 250
 window_width_val = 500
 show_time = 50
+
+def parse_image_orientation(im_or):
+    """For reference, see: https://dicom.nema.org/medical/dicom/current/output/chtml/part03/sect_C.7.6.2.html#sect_C.7.6.2.1.1"""
+    values = [float(i) for i in im_or]
+    row_x, row_y, row_z, col_x, col_y, col_z = values
+    return row_x, row_y, row_z, col_x, col_y, col_z
 
 @dataclass
 class DicomSlice:
@@ -23,21 +28,33 @@ class DicomSlice:
     tags: dict
     path: str
 
+    @staticmethod
+    def correct_orientation(im:np.array, tags:dict):
+        if round(tags['image_orientation_row']) < 0:
+            im = np.flip(im, axis=-1)
+            tags['image_orientation_row'] = 1
+        if round(tags['image_orientation_col']) < 0:
+            im = np.flip(im, axis=-2)
+            tags['image_orientation_col'] = 1
+        return im, tags
+
+
     @classmethod
     def from_path(cls, dcm_path: str, to_uint8=True) -> Tuple[np.array, dict]:
         ds = dcmread(dcm_path)
         tags = cls.read_relevant_tags(ds)
         image = ds.pixel_array
+        image, tags = cls.correct_orientation(image, tags)
         path = dcm_path
         return cls(image=image, tags=tags, path=path)
 
     @staticmethod
     def read_relevant_tags(ds: pydicom.Dataset):
         pixel_spacing_row, pixel_spacing_column = [float(d) for d in ds.PixelSpacing]
+        row_dir, _, _, _, col_dir, _ = parse_image_orientation(ds.ImageOrientationPatient)
         dcm_dict = dict(
             # General Study
             # request_procedure_id=ds.RequestedProcedureID, # also check inside RequestAttributesSequence
-            study_instance_uid=ds.StudyInstanceUID,
             study_date=ds.StudyDate,
             study_time=ds.StudyTime,
             # Series properties
@@ -48,7 +65,7 @@ class DicomSlice:
             series_number=int(ds.SeriesNumber),
             # temporal_position_identifier=int(ds.TemporalPositionIdentifier),
             # Slice properties
-            instance_creation_time=float(ds.InstanceCreationTime),
+            # instance_creation_time=float(ds.InstanceCreationTime),
             instance_number=int(ds.InstanceNumber),
             slice_location=float(ds.SliceLocation),  # in mm (signed)
             slice_thickness=float(ds.SliceThickness),  # in mm
@@ -59,6 +76,8 @@ class DicomSlice:
             pixel_spacing_column=pixel_spacing_column,  # in mm
             window_center=float(ds.WindowCenter),
             window_width=float(ds.WindowWidth),
+            image_orientation_row = row_dir,
+            image_orientation_col = col_dir
             # rescale_intercept=float(ds.RescaleIntercept),
             # rescale_slope=float(ds.RescaleSlope),
             # SpacingBetweenSlices
@@ -119,19 +138,31 @@ class DicomSeries:
         "columns",
         "pixel_spacing_row",
         "pixel_spacing_column",
+        "image_orientation_row",
+        "image_orientation_col"
     ]
 
     @classmethod
     def from_path(cls, series_path: str):
-        slices_files = list_files(series_path, ".dcm")
+        slices_paths = list_files(series_path, ".dcm")
+        return cls.from_slice_paths(slices_paths)
+    
+    @classmethod
+    def from_slice_paths(cls, slice_paths:List[str]):
+        series_path = os.path.split(slice_paths[0])[0]
         slices = []
-        for fp in slices_files:
+        for fp in slice_paths:
             dcm_slice = DicomSlice.from_path(fp)
             slices.append(dcm_slice)
         slices = cls.sort_slices(slices)
         volume = np.stack([s.image for s in slices])
         tags = cls.collapse_tags(slices, cls.tag_names, assert_unique=True)
         return cls(volume=volume, slices=slices, tags=tags, path=series_path)
+
+    @classmethod # TODO: this method should be replaced with a from coma_db.model.RadiologicalSeries instead of the individual ids of the slices
+    def from_slice_ids(cls, slices_ids:List[str], dao:ImageMetadataDao):
+        slice_paths = [dao.get_by_id(i, obj=False)["_filepath"] for i in slices_ids]
+        return cls.from_slice_paths(slice_paths)
 
     @staticmethod
     def collapse_tag(slices: List[DicomSlice], tag_name: str, assert_unique):
@@ -289,7 +320,7 @@ class DicomSeries:
         cv2.imshow(title, image)
         cv2.waitKey(show_time)
 
-    def project(self, laterality: str, view: str):
+    def project(self):# , laterality: str, view: str):
         window_image = DicomSlice.window_image
         to_uint8 = DicomSlice.uint16_to_uint8
         get_image = lambda x: to_uint8(
