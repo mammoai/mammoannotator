@@ -1,3 +1,6 @@
+# Archived in favor of mammoatation repo which does almost the same but better
+The latest branch for this repo is image_resize.
+
 # Mammoannotator
 Tools for setting up a Breast Cancer labeling app.
 
